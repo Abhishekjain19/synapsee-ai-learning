@@ -14,7 +14,272 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      audio_overviews: {
+        Row: {
+          audio_url: string
+          created_at: string
+          duration: number | null
+          id: string
+          notebook_id: string
+          summary_id: string | null
+          title: string
+          transcript: string | null
+        }
+        Insert: {
+          audio_url: string
+          created_at?: string
+          duration?: number | null
+          id?: string
+          notebook_id: string
+          summary_id?: string | null
+          title: string
+          transcript?: string | null
+        }
+        Update: {
+          audio_url?: string
+          created_at?: string
+          duration?: number | null
+          id?: string
+          notebook_id?: string
+          summary_id?: string | null
+          title?: string
+          transcript?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_overviews_notebook_id_fkey"
+            columns: ["notebook_id"]
+            isOneToOne: false
+            referencedRelation: "notebooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audio_overviews_summary_id_fkey"
+            columns: ["summary_id"]
+            isOneToOne: false
+            referencedRelation: "summaries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          notebook_id: string
+          role: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          notebook_id: string
+          role: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          notebook_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_notebook_id_fkey"
+            columns: ["notebook_id"]
+            isOneToOne: false
+            referencedRelation: "notebooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mind_maps: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          notebook_id: string
+          summary_id: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          notebook_id: string
+          summary_id?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          notebook_id?: string
+          summary_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mind_maps_notebook_id_fkey"
+            columns: ["notebook_id"]
+            isOneToOne: false
+            referencedRelation: "notebooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mind_maps_summary_id_fkey"
+            columns: ["summary_id"]
+            isOneToOne: false
+            referencedRelation: "summaries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notebooks: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notebooks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sources: {
+        Row: {
+          content: string | null
+          created_at: string
+          file_path: string | null
+          file_size: number | null
+          id: string
+          notebook_id: string
+          title: string
+          type: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          notebook_id: string
+          title: string
+          type: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          notebook_id?: string
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sources_notebook_id_fkey"
+            columns: ["notebook_id"]
+            isOneToOne: false
+            referencedRelation: "notebooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      summaries: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          key_points: Json | null
+          notebook_id: string
+          title: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          key_points?: Json | null
+          notebook_id: string
+          title: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          key_points?: Json | null
+          notebook_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "summaries_notebook_id_fkey"
+            columns: ["notebook_id"]
+            isOneToOne: false
+            referencedRelation: "notebooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
