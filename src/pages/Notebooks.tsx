@@ -1,74 +1,102 @@
-import { useState } from "react";
-import { Plus, Search } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Search, LogOut, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 import NotebookCard from "@/components/NotebookCard";
 
-const mockNotebooks = [
-  {
-    id: "1",
-    title: "RAG (Retrieval Augmented Generation)",
-    date: "Oct 20, 2025",
-    sources: 4,
-    color: "bg-blue-100 dark:bg-blue-950",
-    icon: "📚",
-  },
-  {
-    id: "2",
-    title: "The impact of artificial Intelligence",
-    date: "Oct 20, 2025",
-    sources: 0,
-    color: "bg-green-100 dark:bg-green-950",
-    icon: "🤖",
-  },
-  {
-    id: "3",
-    title: "Untitled notebook",
-    date: "Oct 20, 2025",
-    sources: 0,
-    color: "bg-purple-100 dark:bg-purple-950",
-    icon: "📓",
-  },
-  {
-    id: "4",
-    title: "Dogs: Domestication, Biology, and Char...",
-    date: "Sep 26, 2025",
-    sources: 12,
-    color: "bg-pink-100 dark:bg-pink-950",
-    icon: "🐕",
-  },
-  {
-    id: "5",
-    title: "Designing a Scalable Backend in Node.j...",
-    date: "Sep 26, 2025",
-    sources: 10,
-    color: "bg-teal-100 dark:bg-teal-950",
-    icon: "⚙️",
-  },
-  {
-    id: "6",
-    title: "Generative AI and Data Breach Costs in...",
-    date: "Sep 26, 2025",
-    sources: 17,
-    color: "bg-rose-100 dark:bg-rose-950",
-    icon: "📊",
-  },
-  {
-    id: "7",
-    title: "An Overview of Retrieval-Augmented Gen...",
-    date: "Sep 26, 2025",
-    sources: 4,
-    color: "bg-cyan-100 dark:bg-cyan-950",
-    icon: "🔍",
-  },
-];
+interface Notebook {
+  id: string;
+  title: string;
+  created_at: string;
+  icon: string;
+  color: string;
+  sources?: { count: number }[];
+}
 
 const Notebooks = () => {
+  const navigate = useNavigate();
+  const { user, loading: authLoading, signOut } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
+  const [notebooks, setNotebooks] = useState<Notebook[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
 
-  const filteredNotebooks = mockNotebooks.filter((notebook) =>
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (user) {
+      fetchNotebooks();
+    }
+  }, [user]);
+
+  const fetchNotebooks = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("notebooks")
+      .select(`
+        id,
+        title,
+        created_at,
+        icon,
+        color,
+        sources(count)
+      `)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast.error("Failed to load notebooks");
+      console.error(error);
+    } else {
+      setNotebooks(data || []);
+    }
+    setLoading(false);
+  };
+
+  const createNotebook = async () => {
+    if (!user) return;
+
+    setCreating(true);
+    const { data, error } = await supabase
+      .from("notebooks")
+      .insert({
+        user_id: user.id,
+        title: "Untitled Notebook",
+        icon: "📓",
+        color: "bg-blue-100 dark:bg-blue-950",
+      })
+      .select()
+      .single();
+
+    setCreating(false);
+
+    if (error) {
+      toast.error("Failed to create notebook");
+      console.error(error);
+    } else {
+      toast.success("Notebook created!");
+      navigate(`/workspace/${data.id}`);
+    }
+  };
+
+  const filteredNotebooks = notebooks.filter((notebook) =>
     notebook.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -77,6 +105,10 @@ const Notebooks = () => {
           <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
             NotebookLM
           </h1>
+          <Button variant="outline" size="sm" onClick={signOut}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Sign Out
+          </Button>
         </div>
 
         <div className="mb-8">
@@ -94,17 +126,33 @@ const Notebooks = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            <button className="group aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-muted/50 transition-all duration-300 flex flex-col items-center justify-center gap-3">
+            <button 
+              className="group aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-muted/50 transition-all duration-300 flex flex-col items-center justify-center gap-3 disabled:opacity-50"
+              onClick={createNotebook}
+              disabled={creating}
+            >
               <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                <Plus className="h-6 w-6 text-primary" />
+                {creating ? (
+                  <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                ) : (
+                  <Plus className="h-6 w-6 text-primary" />
+                )}
               </div>
               <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                Create new notebook
+                {creating ? "Creating..." : "Create new notebook"}
               </span>
             </button>
 
             {filteredNotebooks.map((notebook) => (
-              <NotebookCard key={notebook.id} {...notebook} />
+              <NotebookCard
+                key={notebook.id}
+                id={notebook.id}
+                title={notebook.title}
+                date={new Date(notebook.created_at).toLocaleDateString()}
+                sources={notebook.sources?.[0]?.count || 0}
+                color={notebook.color}
+                icon={notebook.icon}
+              />
             ))}
           </div>
         </div>

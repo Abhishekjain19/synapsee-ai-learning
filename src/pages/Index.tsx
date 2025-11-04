@@ -1,8 +1,19 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Brain, BookOpen, Mic, Map, Sparkles, ArrowRight } from "lucide-react";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate("/notebooks");
+      }
+    });
+  }, [navigate]);
   return (
     <div className="min-h-screen bg-gradient-secondary">
       {/* Hero Section */}
@@ -23,15 +34,15 @@ const Index = () => {
           </p>
           
           <div className="flex gap-4 justify-center">
-            <Link to="/notebooks">
+            <Link to="/auth">
               <Button size="lg" className="bg-gradient-primary hover:opacity-90 transition-opacity">
                 Get Started
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
-            <Link to="/workspace">
+            <Link to="/auth">
               <Button size="lg" variant="outline">
-                Try Workspace
+                Sign In
               </Button>
             </Link>
           </div>
@@ -92,7 +103,7 @@ const Index = () => {
           <p className="text-lg text-white/90 mb-8">
             Join students who are learning faster and smarter with Synapsee.
           </p>
-          <Link to="/notebooks">
+          <Link to="/auth">
             <Button size="lg" variant="secondary" className="bg-white text-primary hover:bg-white/90">
               Start Learning Now
               <ArrowRight className="ml-2 h-4 w-4" />

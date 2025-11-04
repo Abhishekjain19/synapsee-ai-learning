@@ -1,6 +1,8 @@
 import { Card } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
 
 interface NotebookCardProps {
+  id: string;
   title: string;
   date: string;
   sources: number;
@@ -8,9 +10,13 @@ interface NotebookCardProps {
   icon: string;
 }
 
-const NotebookCard = ({ title, date, sources, color, icon }: NotebookCardProps) => {
+const NotebookCard = ({ id, title, date, sources, color, icon }: NotebookCardProps) => {
+  const navigate = useNavigate();
   return (
-    <Card className="group cursor-pointer overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+    <Card 
+      className="group cursor-pointer overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
+      onClick={() => navigate(`/workspace/${id}`)}
+    >
       <div className={`${color} p-6 h-32 flex items-center justify-center`}>
         <span className="text-5xl">{icon}</span>
       </div>
