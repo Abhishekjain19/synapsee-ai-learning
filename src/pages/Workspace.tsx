@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FileText, Upload, Mic, Map, FileBarChart, Send, Loader2, ArrowLeft, ExternalLink, FileUp } from "lucide-react";
+import { FileText, Upload, Send, Loader2, ArrowLeft, ExternalLink, FileUp, FileDown, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -45,8 +45,10 @@ const Workspace = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [researchLinks, setResearchLinks] = useState<ResearchLink[]>([]);
+  const [selectedLinks, setSelectedLinks] = useState<Set<number>>(new Set());
   const [audioOverview, setAudioOverview] = useState<string>("");
   const [mindMapData, setMindMapData] = useState<any>(null);
+  const [report, setReport] = useState<string>("");
   const [activeTab, setActiveTab] = useState("summary");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -203,15 +205,23 @@ const Workspace = () => {
   };
 
   const handleGenerateMindMap = async () => {
-    if (!summary) {
-      toast.error("Please generate a summary first");
+    if (!summary && selectedLinks.size === 0) {
+      toast.error("Please generate a summary or select research links first");
       return;
     }
 
     setGenerating(true);
     try {
+      // Use selected research links or summary
+      const content = selectedLinks.size > 0
+        ? researchLinks
+            .filter((_, idx) => selectedLinks.has(idx))
+            .map(link => `${link.title}: ${link.description}`)
+            .join('\n\n')
+        : summary;
+
       const { data, error } = await supabase.functions.invoke("generate-mind-map", {
-        body: { summary },
+        body: { summary: content },
       });
 
       if (error) throw error;
@@ -238,6 +248,50 @@ const Workspace = () => {
     } finally {
       setGenerating(false);
     }
+  };
+
+  const handleGenerateReport = async () => {
+    if (!summary) {
+      toast.error("Please generate a summary first");
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-report", {
+        body: { 
+          summary, 
+          researchLinks,
+          topic: notebook?.title 
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      setReport(data.report);
+      toast.success("Report generated!");
+      setActiveTab("report");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to generate report");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const toggleLinkSelection = (idx: number) => {
+    const newSelected = new Set(selectedLinks);
+    if (newSelected.has(idx)) {
+      newSelected.delete(idx);
+    } else {
+      newSelected.add(idx);
+    }
+    setSelectedLinks(newSelected);
   };
 
   const handleGenerateAudioOverview = async () => {
@@ -428,60 +482,151 @@ const Workspace = () => {
               </div>
             )}
 
-            {(summary || audioOverview || mindMapData) && !generating && (
+            {(summary || audioOverview || mindMapData || report) && !generating && (
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="mb-4">
                   <TabsTrigger value="summary">📝 Summary</TabsTrigger>
-                  <TabsTrigger value="audio" disabled={!audioOverview}>🎙️ Audio</TabsTrigger>
+                  <TabsTrigger value="report" disabled={!report}>📄 Report</TabsTrigger>
+                  <TabsTrigger value="audio" disabled={!audioOverview}>🎙️ Podcast</TabsTrigger>
                   <TabsTrigger value="mindmap" disabled={!mindMapData}>🗺️ Mind Map</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="summary">
                   <div className="space-y-4">
-                    <div className="flex gap-2 mb-4">
-                      <Button variant="outline" size="sm" onClick={handleGenerateMindMap} disabled={!summary}>
-                        Generate Mind Map
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <Button variant="outline" size="sm" onClick={handleGenerateReport} disabled={!summary}>
+                        <FileDown className="h-4 w-4 mr-2" />
+                        Generate Report
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={handleGenerateMindMap} disabled={!summary && selectedLinks.size === 0}>
+                        🧠 Generate Mind Map
                       </Button>
                       <Button variant="outline" size="sm" onClick={handleGenerateAudioOverview} disabled={!summary}>
-                        Generate Audio Overview
+                        🎧 Generate Podcast
                       </Button>
                     </div>
 
                     <div className="prose dark:prose-invert max-w-none">
-                      <h2>AI Summary</h2>
-                      <p className="whitespace-pre-wrap">{summary}</p>
+                      <div className="mb-6">
+                        <h1 className="text-4xl font-bold mb-4 bg-gradient-primary bg-clip-text text-transparent">
+                          🧠 {notebook?.title}
+                        </h1>
+                        <div className="text-lg leading-relaxed">
+                          {summary.split('\n').map((paragraph, idx) => (
+                            paragraph.trim() && <p key={idx} className="mb-4">{paragraph}</p>
+                          ))}
+                        </div>
+                      </div>
 
                       {keyPoints.length > 0 && (
-                        <>
-                          <h3>Key Points</h3>
-                          <ul>
+                        <div className="bg-accent/20 rounded-lg p-6 border border-border">
+                          <h3 className="text-xl font-semibold mb-4">📊 Key Points</h3>
+                          <ul className="space-y-2">
                             {keyPoints.map((point, idx) => (
-                              <li key={idx}>{point}</li>
+                              <li key={idx} className="flex items-start gap-3">
+                                <span className="text-primary mt-1">•</span>
+                                <span>{point}</span>
+                              </li>
                             ))}
                           </ul>
-                        </>
+                        </div>
                       )}
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="report">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-2xl font-semibold">📄 Research Report</h2>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          const blob = new Blob([report], { type: 'text/markdown' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `${notebook?.title || 'report'}.md`;
+                          a.click();
+                          toast.success("Report downloaded!");
+                        }}
+                      >
+                        <FileDown className="h-4 w-4 mr-2" />
+                        Download
+                      </Button>
+                    </div>
+                    <div className="prose dark:prose-invert max-w-none bg-card border border-border rounded-lg p-8">
+                      <div 
+                        dangerouslySetInnerHTML={{ 
+                          __html: report.replace(/\n/g, '<br />').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
+                        }} 
+                      />
                     </div>
                   </div>
                 </TabsContent>
 
                 <TabsContent value="audio">
                   <div className="space-y-4">
-                    <h2 className="text-2xl font-semibold">Podcast-Style Audio Overview</h2>
-                    <div className="p-6 bg-muted/50 rounded-lg">
-                      <div className="prose dark:prose-invert max-w-none">
-                        <p className="whitespace-pre-wrap">{audioOverview}</p>
+                    <h2 className="text-2xl font-semibold mb-6">🎙️ AI Podcast: AURA × NEO</h2>
+                    
+                    <div className="flex gap-4 mb-6">
+                      <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-lg">
+                        <div className="h-3 w-3 rounded-full bg-primary animate-pulse"></div>
+                        <span className="text-sm font-medium">AURA - Curious Host</span>
+                      </div>
+                      <div className="flex items-center gap-2 px-4 py-2 bg-secondary/10 rounded-lg">
+                        <div className="h-3 w-3 rounded-full bg-secondary animate-pulse"></div>
+                        <span className="text-sm font-medium">NEO - Expert Analyst</span>
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      Audio playback coming soon! For now, enjoy the podcast-style transcript.
+
+                    <div className="bg-gradient-to-br from-card to-muted/30 rounded-lg p-6 border border-border">
+                      <div className="space-y-4">
+                        {audioOverview.split('\n').map((line, idx) => {
+                          if (line.includes('AURA:')) {
+                            return (
+                              <div key={idx} className="flex gap-3 items-start">
+                                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                                  🎙️
+                                </div>
+                                <div className="flex-1 bg-primary/5 rounded-lg p-4">
+                                  <p className="font-medium text-primary mb-1">AURA</p>
+                                  <p>{line.replace(/🎙️\s*AURA:\s*/i, '')}</p>
+                                </div>
+                              </div>
+                            );
+                          } else if (line.includes('NEO:')) {
+                            return (
+                              <div key={idx} className="flex gap-3 items-start">
+                                <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
+                                  🤖
+                                </div>
+                                <div className="flex-1 bg-secondary/5 rounded-lg p-4">
+                                  <p className="font-medium text-secondary mb-1">NEO</p>
+                                  <p>{line.replace(/🤖\s*NEO:\s*/i, '')}</p>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })}
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground text-center mt-4">
+                      🎧 Audio playback coming soon! Enjoy the podcast-style conversation above.
                     </p>
                   </div>
                 </TabsContent>
 
                 <TabsContent value="mindmap">
                   <div className="space-y-4">
-                    <h2 className="text-2xl font-semibold">Interactive Mind Map</h2>
+                    <h2 className="text-2xl font-semibold mb-4">🗺️ Interactive Mind Map</h2>
+                    {selectedLinks.size > 0 && (
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Generated from {selectedLinks.size} selected research link{selectedLinks.size > 1 ? 's' : ''}
+                      </p>
+                    )}
                     {mindMapData && <MindMapVisualization data={mindMapData} />}
                   </div>
                 </TabsContent>
@@ -553,31 +698,61 @@ const Workspace = () => {
       {/* Research Panel */}
       <div className="w-96 border-l border-border bg-card/50">
         <div className="p-4 border-b border-border">
-          <h2 className="font-semibold">Research Links</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Research Links</h2>
+            {selectedLinks.size > 0 && (
+              <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">
+                {selectedLinks.size} selected
+              </span>
+            )}
+          </div>
+          {researchLinks.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Select links to include in mind map
+            </p>
+          )}
         </div>
 
         <ScrollArea className="h-[calc(100vh-80px)]">
           <div className="p-4 space-y-3">
             {researchLinks.length > 0 ? (
               researchLinks.map((link, idx) => (
-                <a
+                <div
                   key={idx}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block p-4 rounded-lg border border-border hover:bg-accent/50 transition-colors"
+                  className="p-4 rounded-lg border border-border hover:bg-accent/50 transition-colors"
                 >
-                  <div className="flex items-start gap-2">
-                    <ExternalLink className="h-4 w-4 mt-1 flex-shrink-0 text-primary" />
+                  <div className="flex items-start gap-3">
+                    <button
+                      onClick={() => toggleLinkSelection(idx)}
+                      className={`mt-1 h-5 w-5 rounded border-2 flex items-center justify-center transition-colors ${
+                        selectedLinks.has(idx)
+                          ? 'bg-primary border-primary text-primary-foreground'
+                          : 'border-muted-foreground/30 hover:border-primary'
+                      }`}
+                    >
+                      {selectedLinks.has(idx) && <CheckSquare className="h-3 w-3" />}
+                    </button>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-sm mb-1 line-clamp-2">{link.title}</h3>
-                      <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                        {link.description}
-                      </p>
-                      <p className="text-xs text-primary">{link.source}</p>
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-start gap-2 group"
+                      >
+                        <ExternalLink className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary group-hover:text-primary/80" />
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-sm mb-1 line-clamp-2 group-hover:text-primary transition-colors">
+                            {link.title}
+                          </h3>
+                          <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                            {link.description}
+                          </p>
+                          <p className="text-xs text-primary">{link.source}</p>
+                        </div>
+                      </a>
                     </div>
                   </div>
-                </a>
+                </div>
               ))
             ) : (
               <div className="text-center py-12">

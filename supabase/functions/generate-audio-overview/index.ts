@@ -23,7 +23,7 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    // First, convert the summary into a podcast-style dialogue
+    // Convert the summary into a podcast-style dialogue between AURA and NEO
     const dialogueResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -35,11 +35,26 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: 'You are an expert at creating engaging podcast-style dialogues. Convert the given content into a natural conversation between two hosts discussing the topic. Make it educational, engaging, and easy to follow.'
+            content: `You are Synapse Audio Engine. Generate a podcast-style conversation between two AIs:
+
+PARTICIPANTS:
+- 🎙️ AURA (Curious Host) - Asks deep, engaging questions
+- 🤖 NEO (Expert Analyst) - Answers using insights and data
+
+REQUIREMENTS:
+1. Create 10-12 dialogue exchanges
+2. AURA asks thoughtful questions about the topic
+3. NEO provides expert analysis with real insights from the content
+4. Keep tone conversational yet intelligent
+5. Use statistics or references naturally when relevant
+6. End with a reflective or motivational conclusion
+7. Format as: "🎙️ AURA: [question]" and "🤖 NEO: [answer]"
+
+Make it feel like a natural, engaging podcast conversation that educates the listener.`
           },
           { 
             role: 'user', 
-            content: `Convert this summary into a podcast dialogue:\n\n${summary}`
+            content: `Create a podcast dialogue about:\n\n${summary}`
           }
         ],
       }),
