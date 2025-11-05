@@ -1,1 +1,19 @@
 project_id = "fsitstvxirwlhoiexxhs"
+
+[functions.generate-summary]
+verify_jwt = false
+
+[functions.generate-mind-map]
+verify_jwt = false
+
+[functions.extract-pdf-text]
+verify_jwt = false
+
+[functions.generate-audio-overview]
+verify_jwt = false
+
+[functions.chat-with-document]
+verify_jwt = false
+
+[functions.fetch-research-links]
+verify_jwt = false
