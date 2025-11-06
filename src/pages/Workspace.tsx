@@ -47,6 +47,7 @@ const Workspace = () => {
   const [researchLinks, setResearchLinks] = useState<ResearchLink[]>([]);
   const [selectedLinks, setSelectedLinks] = useState<Set<number>>(new Set());
   const [audioOverview, setAudioOverview] = useState<{dialogue: string; audioSegments: any[]; providerError?: string | null} | null>(null);
+  const [generatingSegments, setGeneratingSegments] = useState<Set<number>>(new Set());
   const [mindMapData, setMindMapData] = useState<any>(null);
   const [report, setReport] = useState<string>("");
   const [activeTab, setActiveTab] = useState("summary");
@@ -301,6 +302,7 @@ const Workspace = () => {
     }
 
     setGenerating(true);
+    setAudioOverview(null);
     try {
       const { data, error } = await supabase.functions.invoke("generate-audio-overview", {
         body: { summary },
@@ -319,7 +321,14 @@ const Workspace = () => {
         providerError: data.providerError || null,
       });
 
-      if (data.providerError) {
+      const failedCount = (data.audioSegments || []).filter((s: any) => s.status === 'failed').length;
+      const successCount = (data.audioSegments || []).filter((s: any) => s.status === 'success').length;
+
+      if (failedCount > 0 && successCount > 0) {
+        toast.warning(`Generated ${successCount} segments, ${failedCount} failed (you can retry them)`);
+      } else if (failedCount > 0) {
+        toast.warning("All segments failed to generate. You can retry them individually.");
+      } else if (data.providerError) {
         toast.warning("Audio provider limited: showing transcript only.");
       } else {
         toast.success("Audio overview generated!");
@@ -590,7 +599,7 @@ const Workspace = () => {
                       </div>
                     </div>
 
-                    {audioOverview?.audioSegments && audioOverview.audioSegments.length > 0 && (
+                     {audioOverview?.audioSegments && audioOverview.audioSegments.length > 0 && (
                       <div className="mb-6 bg-muted/30 rounded-lg p-4">
                         <h3 className="font-semibold mb-3 flex items-center gap-2">
                           <Volume2 className="h-5 w-5" />
@@ -598,15 +607,71 @@ const Workspace = () => {
                         </h3>
                         <div className="space-y-3">
                           {audioOverview.audioSegments.map((segment: any, idx: number) => (
-                            <div key={idx} className="flex items-center gap-3">
-                              <div className={`h-8 w-8 rounded-full ${segment.speaker === 'AURA' ? 'bg-primary' : 'bg-secondary'} flex items-center justify-center flex-shrink-0 text-sm`}>
-                                {segment.speaker === 'AURA' ? '🎙️' : '🤖'}
+                            <div key={idx} className="space-y-2">
+                              <div className="flex items-center gap-3">
+                                <div className={`h-8 w-8 rounded-full ${segment.speaker === 'AURA' ? 'bg-primary' : 'bg-secondary'} flex items-center justify-center flex-shrink-0 text-sm`}>
+                                  {segment.speaker === 'AURA' ? '🎙️' : '🤖'}
+                                </div>
+                                {segment.status === 'success' && segment.audio ? (
+                                  <audio 
+                                    controls 
+                                    className="flex-1"
+                                    src={`data:audio/mpeg;base64,${segment.audio}`}
+                                  />
+                                ) : segment.status === 'failed' ? (
+                                  <div className="flex-1 flex items-center gap-3 bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-2">
+                                    <span className="text-sm text-destructive flex-1">Failed to generate audio: {segment.error}</span>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={async () => {
+                                        setGeneratingSegments(prev => new Set(prev).add(idx));
+                                        try {
+                                          const { data, error } = await supabase.functions.invoke("generate-single-segment", {
+                                            body: { speaker: segment.speaker, text: segment.text },
+                                          });
+                                          if (error) throw error;
+                                          if (data.error) throw new Error(data.error);
+                                          
+                                          setAudioOverview(prev => {
+                                            if (!prev) return prev;
+                                            const newSegments = [...prev.audioSegments];
+                                            newSegments[idx] = {
+                                              speaker: segment.speaker,
+                                              text: segment.text,
+                                              audio: data.audio,
+                                              status: 'success',
+                                            };
+                                            return { ...prev, audioSegments: newSegments };
+                                          });
+                                          toast.success("Segment regenerated!");
+                                        } catch (error) {
+                                          console.error(error);
+                                          toast.error("Failed to retry segment");
+                                        } finally {
+                                          setGeneratingSegments(prev => {
+                                            const newSet = new Set(prev);
+                                            newSet.delete(idx);
+                                            return newSet;
+                                          });
+                                        }
+                                      }}
+                                      disabled={generatingSegments.has(idx)}
+                                    >
+                                      {generatingSegments.has(idx) ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        "Retry"
+                                      )}
+                                    </Button>
+                                  </div>
+                                ) : null}
                               </div>
-                              <audio 
-                                controls 
-                                className="flex-1"
-                                src={`data:audio/mpeg;base64,${segment.audio}`}
-                              />
+                              {generatingSegments.has(idx) && (
+                                <div className="ml-11 h-1 bg-muted rounded-full overflow-hidden">
+                                  <div className="h-full bg-primary animate-pulse w-3/4"></div>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>

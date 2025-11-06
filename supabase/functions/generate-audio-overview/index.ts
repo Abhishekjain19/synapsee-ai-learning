@@ -64,7 +64,7 @@ serve(async (req) => {
     // 2) Split lines and create TTS for each
     const lines = dialogue.split('\n').filter((line: string) => line.trim().length > 0);
 
-    const audioSegments: Array<{ speaker: 'AURA' | 'NEO'; text: string; audio: string; }> = [];
+    const audioSegments: Array<{ speaker: 'AURA' | 'NEO'; text: string; audio: string | null; status: 'success' | 'failed'; error?: string; }> = [];
     let providerError: string | null = null;
     for (const line of lines) {
       const trimmedLine = line.trim();
@@ -108,13 +108,22 @@ serve(async (req) => {
         if (!ttsResponse.ok) {
           const errorTxt = await ttsResponse.text();
           console.error('ElevenLabs API error:', errorTxt);
-          // Capture provider error but do not fail the entire request
+          let errorMsg = 'API error';
           try {
             const parsed = JSON.parse(errorTxt);
             providerError = parsed?.detail?.message || parsed?.detail || errorTxt;
+            errorMsg = parsed?.detail?.status || 'API error';
           } catch {
             providerError = errorTxt;
+            errorMsg = 'API error';
           }
+          audioSegments.push({
+            speaker,
+            text,
+            audio: null,
+            status: 'failed',
+            error: errorMsg,
+          });
           continue;
         }
   
@@ -125,10 +134,19 @@ serve(async (req) => {
           speaker,
           text,
           audio: base64Audio,
+          status: 'success',
         });
       } catch (e) {
         console.error('TTS fetch error:', e);
-        providerError = e instanceof Error ? e.message : 'Unknown TTS error';
+        const errorMsg = e instanceof Error ? e.message : 'Unknown TTS error';
+        providerError = errorMsg;
+        audioSegments.push({
+          speaker,
+          text,
+          audio: null,
+          status: 'failed',
+          error: errorMsg,
+        });
         continue;
       }
     }
