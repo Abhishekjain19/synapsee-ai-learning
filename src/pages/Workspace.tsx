@@ -584,7 +584,7 @@ const Workspace = () => {
                       </div>
                     </div>
 
-                    {audioOverview.audioSegments && audioOverview.audioSegments.length > 0 && (
+                    {audioOverview?.audioSegments && audioOverview.audioSegments.length > 0 && (
                       <div className="mb-6 bg-muted/30 rounded-lg p-4">
                         <h3 className="font-semibold mb-3 flex items-center gap-2">
                           <Volume2 className="h-5 w-5" />
@@ -607,39 +607,41 @@ const Workspace = () => {
                       </div>
                     )}
 
-                    <div className="bg-gradient-to-br from-card to-muted/30 rounded-lg p-6 border border-border">
-                      <h3 className="font-semibold text-lg mb-4">Transcript</h3>
-                      <div className="space-y-4">
-                        {audioOverview.dialogue.split('\n').map((line, idx) => {
-                          if (line.includes('AURA:')) {
-                            return (
-                              <div key={idx} className="flex gap-3 items-start">
-                                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                                  🎙️
+                    {audioOverview?.dialogue && (
+                      <div className="bg-gradient-to-br from-card to-muted/30 rounded-lg p-6 border border-border">
+                        <h3 className="font-semibold text-lg mb-4">Transcript</h3>
+                        <div className="space-y-4">
+                          {audioOverview.dialogue.split('\n').map((line, idx) => {
+                            if (line.includes('AURA:')) {
+                              return (
+                                <div key={idx} className="flex gap-3 items-start">
+                                  <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                                    🎙️
+                                  </div>
+                                  <div className="flex-1 bg-primary/5 rounded-lg p-4">
+                                    <p className="font-medium text-primary mb-1">AURA</p>
+                                    <p>{line.replace(/🎙️\s*AURA:\s*/i, '')}</p>
+                                  </div>
                                 </div>
-                                <div className="flex-1 bg-primary/5 rounded-lg p-4">
-                                  <p className="font-medium text-primary mb-1">AURA</p>
-                                  <p>{line.replace(/🎙️\s*AURA:\s*/i, '')}</p>
+                              );
+                            } else if (line.includes('NEO:')) {
+                              return (
+                                <div key={idx} className="flex gap-3 items-start">
+                                  <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
+                                    🤖
+                                  </div>
+                                  <div className="flex-1 bg-secondary/5 rounded-lg p-4">
+                                    <p className="font-medium text-secondary mb-1">NEO</p>
+                                    <p>{line.replace(/🤖\s*NEO:\s*/i, '')}</p>
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          } else if (line.includes('NEO:')) {
-                            return (
-                              <div key={idx} className="flex gap-3 items-start">
-                                <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
-                                  🤖
-                                </div>
-                                <div className="flex-1 bg-secondary/5 rounded-lg p-4">
-                                  <p className="font-medium text-secondary mb-1">NEO</p>
-                                  <p>{line.replace(/🤖\s*NEO:\s*/i, '')}</p>
-                                </div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })}
+                              );
+                            }
+                            return null;
+                          })}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </TabsContent>
 
