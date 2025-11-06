@@ -65,7 +65,7 @@ serve(async (req) => {
     const lines = dialogue.split('\n').filter((line: string) => line.trim().length > 0);
 
     const audioSegments: Array<{ speaker: 'AURA' | 'NEO'; text: string; audio: string; }> = [];
-
+    let providerError: string | null = null;
     for (const line of lines) {
       const trimmedLine = line.trim();
       let voiceId = '';
@@ -86,38 +86,51 @@ serve(async (req) => {
 
       console.log(`Generating audio for: ${text.substring(0, 60)}...`);
 
-      const ttsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-        method: 'POST',
-        headers: {
-          'xi-api-key': ELEVENLABS_API_KEY,
-          'Content-Type': 'application/json',
-          'Accept': 'audio/mpeg',
-        },
-        body: JSON.stringify({
-          text,
-          model_id: 'eleven_turbo_v2_5',
-          output_format: 'mp3_44100_128',
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
+      try {
+        const ttsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+          method: 'POST',
+          headers: {
+            'xi-api-key': ELEVENLABS_API_KEY,
+            'Content-Type': 'application/json',
+            'Accept': 'audio/mpeg',
           },
-        }),
-      });
+          body: JSON.stringify({
+            text,
+            model_id: 'eleven_turbo_v2_5',
+            output_format: 'mp3_44100_128',
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.75,
+            },
+          }),
+        });
+  
+        if (!ttsResponse.ok) {
+          const errorTxt = await ttsResponse.text();
+          console.error('ElevenLabs API error:', errorTxt);
+          // Capture provider error but do not fail the entire request
+          try {
+            const parsed = JSON.parse(errorTxt);
+            providerError = parsed?.detail?.message || parsed?.detail || errorTxt;
+          } catch {
+            providerError = errorTxt;
+          }
+          continue;
+        }
+  
+        const audioBuffer = await ttsResponse.arrayBuffer();
+        const base64Audio = base64Encode(audioBuffer);
 
-      if (!ttsResponse.ok) {
-        const errorTxt = await ttsResponse.text();
-        console.error('ElevenLabs API error:', errorTxt);
-        throw new Error(`ElevenLabs API failed: ${errorTxt}`);
+        audioSegments.push({
+          speaker,
+          text,
+          audio: base64Audio,
+        });
+      } catch (e) {
+        console.error('TTS fetch error:', e);
+        providerError = e instanceof Error ? e.message : 'Unknown TTS error';
+        continue;
       }
-
-      const audioBuffer = await ttsResponse.arrayBuffer();
-      const base64Audio = base64Encode(audioBuffer);
-
-      audioSegments.push({
-        speaker,
-        text,
-        audio: base64Audio,
-      });
     }
 
     return new Response(
@@ -125,6 +138,7 @@ serve(async (req) => {
         dialogue,
         audioSegments,
         transcript: dialogue,
+        providerError,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

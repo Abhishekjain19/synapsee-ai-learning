@@ -46,7 +46,7 @@ const Workspace = () => {
   const [chatLoading, setChatLoading] = useState(false);
   const [researchLinks, setResearchLinks] = useState<ResearchLink[]>([]);
   const [selectedLinks, setSelectedLinks] = useState<Set<number>>(new Set());
-  const [audioOverview, setAudioOverview] = useState<{dialogue: string; audioSegments: any[]} | null>(null);
+  const [audioOverview, setAudioOverview] = useState<{dialogue: string; audioSegments: any[]; providerError?: string | null} | null>(null);
   const [mindMapData, setMindMapData] = useState<any>(null);
   const [report, setReport] = useState<string>("");
   const [activeTab, setActiveTab] = useState("summary");
@@ -316,8 +316,14 @@ const Workspace = () => {
       setAudioOverview({
         dialogue: data.dialogue,
         audioSegments: data.audioSegments || [],
+        providerError: data.providerError || null,
       });
-      toast.success("Audio overview generated!");
+
+      if (data.providerError) {
+        toast.warning("Audio provider limited: showing transcript only.");
+      } else {
+        toast.success("Audio overview generated!");
+      }
       setActiveTab("audio");
     } catch (error) {
       console.error(error);
