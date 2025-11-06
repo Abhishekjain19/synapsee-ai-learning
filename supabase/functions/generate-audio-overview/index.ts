@@ -1,21 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function u8ToBase64(u8: Uint8Array): string {
-  // Safe conversion without overwhelming call stack
-  let binary = "";
-  const chunkSize = 0x8000; // 32KB chunks
-  for (let i = 0; i < u8.length; i += chunkSize) {
-    const chunk = u8.subarray(i, i + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -121,7 +111,7 @@ serve(async (req) => {
       }
 
       const audioBuffer = await ttsResponse.arrayBuffer();
-      const base64Audio = u8ToBase64(new Uint8Array(audioBuffer));
+      const base64Audio = base64Encode(audioBuffer);
 
       audioSegments.push({
         speaker,
