@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FileText, Upload, Send, Loader2, ArrowLeft, ExternalLink, FileUp, FileDown, CheckSquare } from "lucide-react";
+import { FileText, Upload, Send, Loader2, ArrowLeft, ExternalLink, FileUp, FileDown, CheckSquare, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,7 +46,7 @@ const Workspace = () => {
   const [chatLoading, setChatLoading] = useState(false);
   const [researchLinks, setResearchLinks] = useState<ResearchLink[]>([]);
   const [selectedLinks, setSelectedLinks] = useState<Set<number>>(new Set());
-  const [audioOverview, setAudioOverview] = useState<string>("");
+  const [audioOverview, setAudioOverview] = useState<{dialogue: string; audioSegments: any[]} | null>(null);
   const [mindMapData, setMindMapData] = useState<any>(null);
   const [report, setReport] = useState<string>("");
   const [activeTab, setActiveTab] = useState("summary");
@@ -313,7 +313,10 @@ const Workspace = () => {
         return;
       }
 
-      setAudioOverview(data.dialogue);
+      setAudioOverview({
+        dialogue: data.dialogue,
+        audioSegments: data.audioSegments || [],
+      });
       toast.success("Audio overview generated!");
       setActiveTab("audio");
     } catch (error) {
@@ -581,9 +584,33 @@ const Workspace = () => {
                       </div>
                     </div>
 
+                    {audioOverview.audioSegments && audioOverview.audioSegments.length > 0 && (
+                      <div className="mb-6 bg-muted/30 rounded-lg p-4">
+                        <h3 className="font-semibold mb-3 flex items-center gap-2">
+                          <Volume2 className="h-5 w-5" />
+                          Audio Podcast
+                        </h3>
+                        <div className="space-y-3">
+                          {audioOverview.audioSegments.map((segment: any, idx: number) => (
+                            <div key={idx} className="flex items-center gap-3">
+                              <div className={`h-8 w-8 rounded-full ${segment.speaker === 'AURA' ? 'bg-primary' : 'bg-secondary'} flex items-center justify-center flex-shrink-0 text-sm`}>
+                                {segment.speaker === 'AURA' ? '🎙️' : '🤖'}
+                              </div>
+                              <audio 
+                                controls 
+                                className="flex-1"
+                                src={`data:audio/mpeg;base64,${segment.audio}`}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="bg-gradient-to-br from-card to-muted/30 rounded-lg p-6 border border-border">
+                      <h3 className="font-semibold text-lg mb-4">Transcript</h3>
                       <div className="space-y-4">
-                        {audioOverview.split('\n').map((line, idx) => {
+                        {audioOverview.dialogue.split('\n').map((line, idx) => {
                           if (line.includes('AURA:')) {
                             return (
                               <div key={idx} className="flex gap-3 items-start">
@@ -613,9 +640,6 @@ const Workspace = () => {
                         })}
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground text-center mt-4">
-                      🎧 Audio playback coming soon! Enjoy the podcast-style conversation above.
-                    </p>
                   </div>
                 </TabsContent>
 
