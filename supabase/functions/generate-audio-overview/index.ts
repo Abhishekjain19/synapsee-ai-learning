@@ -25,10 +25,6 @@ serve(async (req) => {
     if (!OPENROUTER_API_KEY) {
       throw new Error('OPENROUTER_API_KEY is not configured');
     }
-    
-    if (!ELEVENLABS_API_KEY) {
-      throw new Error('ELEVENLABS_API_KEY is not configured');
-    }
 
     // 1) Generate podcast-style dialogue (AURA / NEO)
     const dialogueResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -86,69 +82,105 @@ serve(async (req) => {
 
       console.log(`Generating audio for: ${text.substring(0, 60)}...`);
 
-      try {
-        const ttsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-          method: 'POST',
-          headers: {
-            'xi-api-key': ELEVENLABS_API_KEY,
-            'Content-Type': 'application/json',
-            'Accept': 'audio/mpeg',
-          },
-          body: JSON.stringify({
-            text,
-            model_id: 'eleven_turbo_v2_5',
-            output_format: 'mp3_44100_128',
-            voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.75,
-            },
-          }),
-        });
-  
-        if (!ttsResponse.ok) {
-          const errorTxt = await ttsResponse.text();
-          console.error('ElevenLabs API error:', errorTxt);
-          let errorMsg = 'API error';
-          try {
-            const parsed = JSON.parse(errorTxt);
-            providerError = parsed?.detail?.message || parsed?.detail || errorTxt;
-            errorMsg = parsed?.detail?.status || 'API error';
-          } catch {
-            providerError = errorTxt;
-            errorMsg = 'API error';
-          }
-          audioSegments.push({
-            speaker,
-            text,
-            audio: null,
-            status: 'failed',
-            error: errorMsg,
-          });
-          continue;
-        }
-  
-        const audioBuffer = await ttsResponse.arrayBuffer();
-        const base64Audio = base64Encode(audioBuffer);
+      let audioData: string | null = null;
+      let errorMsg = '';
+      let currentStatus: 'success' | 'failed' = 'failed';
 
-        audioSegments.push({
-          speaker,
-          text,
-          audio: base64Audio,
-          status: 'success',
-        });
-      } catch (e) {
-        console.error('TTS fetch error:', e);
-        const errorMsg = e instanceof Error ? e.message : 'Unknown TTS error';
-        providerError = errorMsg;
-        audioSegments.push({
-          speaker,
-          text,
-          audio: null,
-          status: 'failed',
-          error: errorMsg,
-        });
-        continue;
+      // Try ElevenLabs first if API key is available
+      if (ELEVENLABS_API_KEY) {
+        try {
+          const ttsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+            method: 'POST',
+            headers: {
+              'xi-api-key': ELEVENLABS_API_KEY,
+              'Content-Type': 'application/json',
+              'Accept': 'audio/mpeg',
+            },
+            body: JSON.stringify({
+              text,
+              model_id: 'eleven_turbo_v2_5',
+              output_format: 'mp3_44100_128',
+              voice_settings: {
+                stability: 0.5,
+                similarity_boost: 0.75,
+              },
+            }),
+          });
+    
+          if (ttsResponse.ok) {
+            const audioBuffer = await ttsResponse.arrayBuffer();
+            audioData = base64Encode(audioBuffer);
+            currentStatus = 'success';
+            console.log('✓ ElevenLabs TTS success');
+          } else {
+            const errorTxt = await ttsResponse.text();
+            console.error('ElevenLabs API error:', errorTxt);
+            try {
+              const parsed = JSON.parse(errorTxt);
+              providerError = parsed?.detail?.message || parsed?.detail || errorTxt;
+              errorMsg = parsed?.detail?.status || 'ElevenLabs error';
+            } catch {
+              providerError = errorTxt;
+              errorMsg = 'ElevenLabs error';
+            }
+          }
+        } catch (e) {
+          console.error('ElevenLabs fetch error:', e);
+          errorMsg = e instanceof Error ? e.message : 'ElevenLabs error';
+          providerError = errorMsg;
+        }
       }
+
+      // Fallback to Google TTS if ElevenLabs failed or unavailable
+      if (!audioData) {
+        console.log('→ Falling back to Google TTS');
+        try {
+          const googleVoice = speaker === 'AURA' ? 'en-US-Neural2-F' : 'en-US-Neural2-J';
+          const googleResponse = await fetch(
+            `https://texttospeech.googleapis.com/v1/text:synthesize?key=${Deno.env.get('GOOGLE_CLOUD_API_KEY')}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                input: { text },
+                voice: {
+                  languageCode: 'en-US',
+                  name: googleVoice,
+                },
+                audioConfig: {
+                  audioEncoding: 'MP3',
+                  pitch: 0,
+                  speakingRate: 1.0,
+                },
+              }),
+            }
+          );
+
+          if (googleResponse.ok) {
+            const googleData = await googleResponse.json();
+            audioData = googleData.audioContent;
+            currentStatus = 'success';
+            console.log('✓ Google TTS success');
+          } else {
+            const googleError = await googleResponse.text();
+            console.error('Google TTS error:', googleError);
+            errorMsg = 'Both ElevenLabs and Google TTS failed';
+            providerError = errorMsg;
+          }
+        } catch (e) {
+          console.error('Google TTS fetch error:', e);
+          errorMsg = 'Both TTS providers failed';
+          providerError = errorMsg;
+        }
+      }
+
+      audioSegments.push({
+        speaker,
+        text,
+        audio: audioData,
+        status: currentStatus,
+        error: currentStatus === 'failed' ? errorMsg : undefined,
+      });
     }
 
     return new Response(
