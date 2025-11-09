@@ -31,7 +31,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-exp:free',
+        model: 'anthropic/claude-3.5-sonnet',
         messages: [
           { 
             role: 'system', 
