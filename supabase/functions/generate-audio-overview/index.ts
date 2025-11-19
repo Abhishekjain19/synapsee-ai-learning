@@ -25,6 +25,10 @@ serve(async (req) => {
     if (!OPENROUTER_API_KEY) {
       throw new Error('OPENROUTER_API_KEY is not configured');
     }
+    
+    if (!ELEVENLABS_API_KEY) {
+      console.warn('ELEVENLABS_API_KEY not configured, browser TTS will be used as fallback');
+    }
 
     // 1) Generate podcast-style dialogue (AURA / NEO)
     const dialogueResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -131,47 +135,10 @@ serve(async (req) => {
         }
       }
 
-      // Fallback to Google TTS if ElevenLabs failed or unavailable
+      // If ElevenLabs failed, browser TTS will be used on frontend
       if (!audioData) {
-        console.log('→ Falling back to Google TTS');
-        try {
-          const googleVoice = speaker === 'AURA' ? 'en-US-Neural2-F' : 'en-US-Neural2-J';
-          const googleResponse = await fetch(
-            `https://texttospeech.googleapis.com/v1/text:synthesize?key=${Deno.env.get('GOOGLE_CLOUD_API_KEY')}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                input: { text },
-                voice: {
-                  languageCode: 'en-US',
-                  name: googleVoice,
-                },
-                audioConfig: {
-                  audioEncoding: 'MP3',
-                  pitch: 0,
-                  speakingRate: 1.0,
-                },
-              }),
-            }
-          );
-
-          if (googleResponse.ok) {
-            const googleData = await googleResponse.json();
-            audioData = googleData.audioContent;
-            currentStatus = 'success';
-            console.log('✓ Google TTS success');
-          } else {
-            const googleError = await googleResponse.text();
-            console.error('Google TTS error:', googleError);
-            errorMsg = 'Both ElevenLabs and Google TTS failed';
-            providerError = errorMsg;
-          }
-        } catch (e) {
-          console.error('Google TTS fetch error:', e);
-          errorMsg = 'Both TTS providers failed';
-          providerError = errorMsg;
-        }
+        console.log('→ ElevenLabs unavailable, browser TTS will be used on frontend');
+        errorMsg = 'ElevenLabs unavailable - using browser TTS';
       }
 
       audioSegments.push({

@@ -29,23 +29,42 @@ export const PodcastPlayer = ({ segments }: PodcastPlayerProps) => {
   }, [volume]);
 
   useEffect(() => {
-    if (audioRef.current && currentSegment?.audio) {
-      audioRef.current.src = `data:audio/mpeg;base64,${currentSegment.audio}`;
-      if (isPlaying) {
-        audioRef.current.play();
+    if (currentSegment) {
+      if (currentSegment.audio && audioRef.current) {
+        // Use ElevenLabs audio
+        audioRef.current.src = `data:audio/mpeg;base64,${currentSegment.audio}`;
+        if (isPlaying) {
+          audioRef.current.play();
+        }
+      } else if (!currentSegment.audio) {
+        // Fallback to browser Web Speech API
+        if (isPlaying) {
+          const utterance = new SpeechSynthesisUtterance(currentSegment.text);
+          utterance.voice = speechSynthesis.getVoices().find(v => 
+            currentSegment.speaker === 'AURA' ? v.name.includes('Female') || v.name.includes('Samantha') : v.name.includes('Male') || v.name.includes('Daniel')
+          ) || speechSynthesis.getVoices()[0];
+          utterance.onend = () => handleEnded();
+          speechSynthesis.cancel();
+          speechSynthesis.speak(utterance);
+        }
       }
     }
-  }, [currentIndex, currentSegment?.audio]);
+  }, [currentIndex, currentSegment?.audio, isPlaying]);
 
   const togglePlay = () => {
-    if (audioRef.current) {
+    if (currentSegment?.audio && audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause();
       } else {
         audioRef.current.play();
       }
-      setIsPlaying(!isPlaying);
+    } else {
+      // Toggle for browser TTS
+      if (isPlaying) {
+        speechSynthesis.cancel();
+      }
     }
+    setIsPlaying(!isPlaying);
   };
 
   const handleNext = () => {
