@@ -94,6 +94,48 @@ export type Database = {
           },
         ]
       }
+      flashcards: {
+        Row: {
+          answer: string
+          created_at: string
+          id: string
+          notebook_id: string
+          question: string
+          summary_id: string | null
+        }
+        Insert: {
+          answer: string
+          created_at?: string
+          id?: string
+          notebook_id: string
+          question: string
+          summary_id?: string | null
+        }
+        Update: {
+          answer?: string
+          created_at?: string
+          id?: string
+          notebook_id?: string
+          question?: string
+          summary_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flashcards_notebook_id_fkey"
+            columns: ["notebook_id"]
+            isOneToOne: false
+            referencedRelation: "notebooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flashcards_summary_id_fkey"
+            columns: ["summary_id"]
+            isOneToOne: false
+            referencedRelation: "summaries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mind_maps: {
         Row: {
           created_at: string
@@ -203,6 +245,38 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      reports: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          notebook_id: string
+          title: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          notebook_id: string
+          title: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          notebook_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_notebook_id_fkey"
+            columns: ["notebook_id"]
+            isOneToOne: false
+            referencedRelation: "notebooks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sources: {
         Row: {
