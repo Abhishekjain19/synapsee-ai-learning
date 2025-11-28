@@ -277,7 +277,11 @@ const Workspace = () => {
       if (error) throw error;
 
       if (data.error) {
-        toast.error(data.error);
+        if (data.error.includes("credits exhausted")) {
+          toast.error("⚠️ OpenRouter credits exhausted! Please add credits at openrouter.ai/credits");
+        } else {
+          toast.error(data.error);
+        }
         return;
       }
 
@@ -324,7 +328,11 @@ const Workspace = () => {
       if (error) throw error;
 
       if (data.error) {
-        toast.error(data.error);
+        if (data.error.includes("credits exhausted")) {
+          toast.error("⚠️ OpenRouter credits exhausted! Please add credits at openrouter.ai/credits");
+        } else {
+          toast.error(data.error);
+        }
         return;
       }
 
@@ -415,7 +423,11 @@ const Workspace = () => {
       if (error) throw error;
 
       if (data.error) {
-        toast.error(data.error);
+        if (data.error.includes("credits exhausted")) {
+          toast.error("⚠️ OpenRouter credits exhausted! Please add credits at openrouter.ai/credits");
+        } else {
+          toast.error(data.error);
+        }
         return;
       }
 
