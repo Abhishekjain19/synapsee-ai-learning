@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { getDocument } from 'https://esm.sh/pdfjs-dist@3.11.174/legacy/build/pdf.mjs';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -58,70 +59,41 @@ serve(async (req) => {
 
     console.log('PDF uploaded successfully:', fileName);
 
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('documents')
-      .getPublicUrl(fileName);
+    // Extract text using PDF.js library
+    console.log('Extracting text from PDF...');
 
-    // Use Lovable AI with document URL to extract text
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
-    }
+    try {
+      const pdf = await getDocument({
+        data: new Uint8Array(fileBytes),
+        useSystemFonts: true,
+      }).promise;
 
-    console.log('Extracting text with AI...');
-
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { 
-            role: 'system', 
-            content: 'You are a PDF text extraction assistant. Extract all text content from PDFs accurately, preserving structure and formatting where possible.'
-          },
-          { 
-            role: 'user', 
-            content: `Extract all text from this PDF. Return ONLY the extracted text content with no additional commentary or formatting. PDF URL: ${publicUrl}`
-          }
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      let extractedText = '';
+      
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ');
+        extractedText += pageText + '\n\n';
       }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
-      throw new Error('Failed to extract PDF text');
+
+      console.log('Text extracted successfully, length:', extractedText.length);
+
+      // Clean up: delete the uploaded file
+      await supabase.storage.from('documents').remove([fileName]);
+
+      return new Response(
+        JSON.stringify({ text: extractedText }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (pdfError) {
+      console.error('PDF extraction error:', pdfError);
+      // Clean up on error
+      await supabase.storage.from('documents').remove([fileName]);
+      throw new Error('Failed to extract text from PDF');
     }
-
-    const data = await response.json();
-    const extractedText = data.choices[0].message.content;
-
-    console.log('Text extracted successfully, length:', extractedText.length);
-
-    // Clean up: delete the uploaded file
-    await supabase.storage.from('documents').remove([fileName]);
-
-    return new Response(
-      JSON.stringify({ text: extractedText }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
 
   } catch (error) {
     console.error('Error in extract-pdf-text:', error);
