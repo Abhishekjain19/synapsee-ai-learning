@@ -60,6 +60,9 @@ Use clean, formal, research-friendly tone. Format with proper markdown for reada
     });
 
     if (!reportResponse.ok) {
+      const errorText = await reportResponse.text();
+      console.error('OpenRouter error:', reportResponse.status, errorText);
+      
       if (reportResponse.status === 429) {
         return new Response(
           JSON.stringify({ error: "OpenRouter rate limit exceeded. Please try again later." }),
@@ -72,7 +75,10 @@ Use clean, formal, research-friendly tone. Format with proper markdown for reada
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      throw new Error('Failed to generate report');
+      return new Response(
+        JSON.stringify({ error: `OpenRouter error: ${errorText}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const reportData = await reportResponse.json();

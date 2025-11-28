@@ -53,9 +53,25 @@ serve(async (req) => {
     });
 
     if (!dialogueResponse.ok) {
-      const t = await dialogueResponse.text();
-      console.error('Dialogue generation failed:', t);
-      throw new Error('Failed to generate dialogue');
+      const errorText = await dialogueResponse.text();
+      console.error('Dialogue generation failed:', errorText);
+      
+      if (dialogueResponse.status === 429) {
+        return new Response(
+          JSON.stringify({ error: "OpenRouter rate limit exceeded. Please try again later." }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (dialogueResponse.status === 402) {
+        return new Response(
+          JSON.stringify({ error: "OpenRouter credits exhausted. Please add credits at https://openrouter.ai/credits" }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      return new Response(
+        JSON.stringify({ error: `OpenRouter error: ${errorText}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const dialogueData = await dialogueResponse.json();
