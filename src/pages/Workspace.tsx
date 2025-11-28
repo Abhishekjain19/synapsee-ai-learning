@@ -51,6 +51,7 @@ const Workspace = () => {
   const [mindMapData, setMindMapData] = useState<any>(null);
   const [report, setReport] = useState<string>("");
   const [activeTab, setActiveTab] = useState("summary");
+  const [flashcards, setFlashcards] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -58,8 +59,103 @@ const Workspace = () => {
       fetchNotebook();
       fetchSources();
       fetchResearchLinks();
+      fetchPersistedContent();
     }
   }, [notebookId]);
+
+  const fetchPersistedContent = async () => {
+    try {
+      // Fetch most recent summary
+      const { data: summaryData } = await supabase
+        .from("summaries")
+        .select("*")
+        .eq("notebook_id", notebookId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (summaryData) {
+        setSummary(summaryData.content);
+        const points = summaryData.key_points;
+        if (Array.isArray(points) && points.every(p => typeof p === 'string')) {
+          setKeyPoints(points as string[]);
+        } else {
+          setKeyPoints([]);
+        }
+      }
+
+      // Fetch most recent mind map
+      const { data: mindMapData } = await supabase
+        .from("mind_maps")
+        .select("*")
+        .eq("notebook_id", notebookId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (mindMapData) {
+        setMindMapData(mindMapData.data);
+      }
+
+      // Fetch most recent report
+      const { data: reportData } = await supabase
+        .from("reports")
+        .select("*")
+        .eq("notebook_id", notebookId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (reportData) {
+        setReport(reportData.content);
+      }
+
+      // Fetch most recent audio overview
+      const { data: audioData } = await supabase
+        .from("audio_overviews")
+        .select("*")
+        .eq("notebook_id", notebookId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (audioData) {
+        // Audio overview doesn't store full segment data, just transcript
+        setAudioOverview({
+          dialogue: audioData.transcript || "",
+          audioSegments: [],
+          providerError: null
+        });
+      }
+
+      // Fetch flashcards
+      const { data: flashcardsData } = await supabase
+        .from("flashcards")
+        .select("*")
+        .eq("notebook_id", notebookId)
+        .order("created_at", { ascending: false });
+
+      if (flashcardsData) {
+        setFlashcards(flashcardsData);
+      }
+
+      // Fetch chat messages
+      const { data: chatData } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("notebook_id", notebookId)
+        .order("created_at", { ascending: true });
+
+      if (chatData) {
+        setChatMessages(chatData.map((msg: any) => ({
+          role: msg.role as "user" | "assistant",
+          content: msg.content
+        })));
+      }
+    } catch (error) {
+      console.error("Error fetching persisted content:", error);
+    }
+  };
 
   const fetchNotebook = async () => {
     const { data, error } = await supabase
@@ -275,6 +371,14 @@ const Workspace = () => {
       }
 
       setReport(data.report);
+      
+      // Save report to database
+      await supabase.from("reports").insert({
+        notebook_id: notebookId,
+        title: `${notebook?.title} Report`,
+        content: data.report,
+      });
+
       toast.success("Report generated!");
       setActiveTab("report");
     } catch (error) {
@@ -362,7 +466,14 @@ const Workspace = () => {
       if (error) throw error;
 
       if (data.error) {
-        toast.error(data.error);
+        // Handle specific error codes
+        if (data.error.includes("402") || data.error.includes("credits exhausted")) {
+          toast.error("OpenRouter credits exhausted. Please add credits to your OpenRouter account.");
+        } else if (data.error.includes("429") || data.error.includes("rate limit")) {
+          toast.error("Rate limit exceeded. Please wait a moment and try again.");
+        } else {
+          toast.error(data.error);
+        }
         return;
       }
 
